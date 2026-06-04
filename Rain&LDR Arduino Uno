@@ -1,0 +1,101 @@
+#include <Servo.h>
+
+const int pinHujan  = 5;  // Hubungkan ke pin Digital 5 Arduino Uno
+const int pinLDR    = A0; // Hubungkan ke pin Analog A0 Arduino Uno
+const int pinServo  = 4;  // Hubungkan ke pin Digital 4 Arduino Uno
+const int pinBuzzer = 2;  // Hubungkan ke pin Digital 2 Arduino Uno
+
+Servo myservo;
+
+const int batasTerang  = 200; 
+const int batasMendung = 350; 
+
+bool statusBuzzer = false; 
+unsigned long waktuLama = 0; // Untuk menggantikan jeda timer 1 detik tanpa memblokir program
+
+void setup() {
+  Serial.begin(115200); // Pastikan Baud Rate di Serial Monitor diatur ke 115200
+
+  // Menggunakan INPUT_PULLUP agar pin 5 stabil menerima logika HIGH saat kering
+  pinMode(pinHujan, INPUT_PULLUP);
+  
+  pinMode(pinBuzzer, OUTPUT);
+  noTone(pinBuzzer); // Buzzer MATI di awal
+
+  myservo.attach(pinServo);
+  myservo.write(0); // Posisi awal jemuran MASUK
+  
+  Serial.println("=========================================");
+  Serial.println("Sistem Jemuran Otomatis Arduino Uno Ready");
+  Serial.println("=========================================");
+}
+
+void loop() {
+  // Menjalankan fungsi pembacaan setiap 1 detik (1000 milidetik) mirip BlynkTimer
+  if (millis() - waktuLama >= 1000) {
+    waktuLama = millis();
+    kirimDataSensor();
+  }
+}
+
+void kirimDataSensor() {
+  int statusHujan = digitalRead(pinHujan); // LOW = Hujan, HIGH = Tidak Hujan
+  int nilaiLDR = analogRead(pinLDR);
+  String statusJemuranText = "";
+
+  // =============================================
+  // KONDISI 1: HUJAN (Siang atau Malam) → Buzzer BUNYI
+  // =============================================
+  if (statusHujan == LOW) {
+    myservo.write(0); // Jemuran MASUK (0 derajat)
+
+    // Efek bip-bip setiap 1 detik
+    statusBuzzer = !statusBuzzer;
+    if (statusBuzzer) {
+      tone(pinBuzzer, 1000); // BUNYI 1000 Hz
+    } else {
+      noTone(pinBuzzer);     // DIAM (efek bip)
+    }
+
+    // Hujan Siang: LDR Terang
+    if (nilaiLDR < batasTerang) {
+      statusJemuranText = "Hujan Siang (Jemuran Masuk)";
+    }
+    // Hujan Malam: LDR Gelap
+    else {
+      statusJemuranText = "Hujan Malam (Jemuran Masuk)";
+    }
+  }
+
+  // =============================================
+  // KONDISI 2: TIDAK HUJAN → Buzzer MATI
+  // =============================================
+  else {
+    noTone(pinBuzzer); // Buzzer selalu MATI jika tidak hujan
+    statusBuzzer = false;
+
+    // A. Cerah (Terang) → Jemuran KELUAR
+    if (nilaiLDR < batasTerang) {
+      myservo.write(90); // Jemuran KELUAR (90 derajat sesuai permintaan)
+      statusJemuranText = "Cerah (Jemuran Keluar)";
+    }
+    // B. Mendung (Agak Gelap) → Jemuran TETAP KELUAR
+    else if (nilaiLDR >= batasTerang && nilaiLDR <= batasMendung) {
+      myservo.write(90); // Jemuran TETAP KELUAR (90 derajat sesuai permintaan)
+      statusJemuranText = "Mendung (Jemuran Keluar)";
+    }
+    // C. Malam Tidak Hujan (Gelap) → Jemuran MASUK
+    else {
+      myservo.write(0); // Jemuran MASUK (0 derajat)
+      statusJemuranText = "Malam (Jemuran Masuk)";
+    }
+  }
+
+  // Debug Output ke Serial Monitor (Sebagai pengganti Dashboard Blynk saat UAP)
+  Serial.print("Hujan: "); 
+  if (statusHujan == LOW) Serial.print("YA (LOW)"); 
+  else Serial.print("TIDAK (HIGH)");
+  
+  Serial.print(" | LDR: "); Serial.print(nilaiLDR);
+  Serial.print(" | Kondisi: "); Serial.println(statusJemuranText);
+}
