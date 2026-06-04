@@ -1,0 +1,66 @@
+#include <Servo.h>
+
+const int pinLDR    = A0; // Hubungkan ke pin Analog A0
+const int pinServo  = 4;  // Hubungkan ke pin Digital 4
+const int pinBuzzer = 2;  // Hubungkan ke pin Digital 2
+
+Servo myservo;
+bool statusBuzzer = false;
+unsigned long waktuLama = 0; 
+
+const int batasTerang  = 200; 
+const int batasMendung = 350; 
+
+void setup() {
+  Serial.begin(115200);
+  
+  pinMode(pinBuzzer, OUTPUT);
+  noTone(pinBuzzer); // Buzzer MATI di awal
+  
+  myservo.attach(pinServo);
+  myservo.write(0); // Posisi awal masuk
+  
+  Serial.println("=== Sistem Sensor LDR + Buzzer Ready ===");
+}
+
+void loop() {
+  if (millis() - waktuLama >= 1000) {
+    waktuLama = millis();
+    
+    int nilaiLDR = analogRead(pinLDR);
+
+    // A. Cerah (Terang) → Jemuran KELUAR, Buzzer MATI
+    if (nilaiLDR < batasTerang) {
+      myservo.write(90); 
+      noTone(pinBuzzer);
+      statusBuzzer = false;
+      
+      Serial.print("LDR: "); Serial.print(nilaiLDR);
+      Serial.println(" -> Kondisi: Cerah (Jemuran Keluar)");
+    }
+    // B. Mendung (Agak Gelap) → Jemuran TETAP KELUAR, Buzzer MATI
+    else if (nilaiLDR >= batasTerang && nilaiLDR <= batasMendung) {
+      myservo.write(90); 
+      noTone(pinBuzzer);
+      statusBuzzer = false;
+      
+      Serial.print("LDR: "); Serial.print(nilaiLDR);
+      Serial.println(" -> Kondisi: Mendung (Jemuran Keluar)");
+    }
+    // C. Malam (Gelap) → Jemuran MASUK, Buzzer BUNYI BIP-BIP
+    else {
+      myservo.write(0); 
+      
+      // Efek bip-bip setiap 1 detik pas malam hari
+      statusBuzzer = !statusBuzzer;
+      if (statusBuzzer) {
+        tone(pinBuzzer, 1000); // Bunyi 1000 Hz
+      } else {
+        noTone(pinBuzzer);     // Diam
+      }
+      
+      Serial.print("LDR: "); Serial.print(nilaiLDR);
+      Serial.println(" -> Kondisi: Malam (Jemuran Masuk & Buzzer Menyala)");
+    }
+  }
+}
