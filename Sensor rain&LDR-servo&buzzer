@@ -87,9 +87,6 @@ void kirimDataSensor() {
 
 void setup() {
   Serial.begin(115200);
-
-  // --- PERBAIKAN DI SINI ---
-  // Menggunakan INPUT_PULLUP agar pin D5 stabil menerima logika HIGH saat kering
   pinMode(pinHujan, INPUT_PULLUP);
   
   pinMode(pinBuzzer, OUTPUT);
