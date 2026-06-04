@@ -1,0 +1,50 @@
+#include <Servo.h>
+
+const int pinHujan  = D5;  // Hubungkan ke pin D5 NodeMCU
+const int pinServo  = D4;  // Hubungkan ke pin D4 NodeMCU
+const int pinBuzzer = D1;  // Hubungkan ke pin D1 NodeMCU
+
+Servo myservo;
+bool statusBuzzer = false; 
+unsigned long waktuLama = 0; 
+
+void setup() {
+  Serial.begin(115200); // Baud rate serial monitor diset ke 115200
+  
+  // Menggunakan INPUT_PULLUP agar pin D5 stabil menerima logika HIGH saat kering
+  pinMode(pinHujan, INPUT_PULLUP);
+  pinMode(pinBuzzer, OUTPUT);
+  noTone(pinBuzzer); 
+
+  myservo.attach(pinServo);
+  myservo.write(0); // Posisi awal masuk
+  
+  Serial.println("=== Sistem Sensor Hujan ESP8266 Ready ===");
+}
+
+void loop() {
+  if (millis() - waktuLama >= 1000) {
+    waktuLama = millis();
+    
+    int statusHujan = digitalRead(pinHujan); // LOW = Hujan, HIGH = Tidak Hujan
+
+    if (statusHujan == LOW) {
+      myservo.write(0); // Jemuran MASUK
+
+      // Efek bip-bip setiap 1 detik
+      statusBuzzer = !statusBuzzer;
+      if (statusBuzzer) {
+        tone(pinBuzzer, 1000); 
+      } else {
+        noTone(pinBuzzer);     
+      }
+      Serial.println("Status: Hujan (Jemuran Masuk & Buzzer Menyala)");
+    } 
+    else {
+      noTone(pinBuzzer); 
+      statusBuzzer = false;
+      myservo.write(90); // Jemuran KELUAR
+      Serial.println("Status: Aman/Kering (Jemuran Keluar)");
+    }
+  }
+}
