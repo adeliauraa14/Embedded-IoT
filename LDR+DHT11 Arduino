@@ -65,7 +65,7 @@ void loop() {
   if (nilaiLDR > batasGelap) {
     lcd.print("Lampu: ON (Gelap)");
   } else {
-    lcd.print("Lampu: OFF(Terg)");
+    lcd.print("Lampu: OFF(Trg) ");
   }
 
   delay(1500);
