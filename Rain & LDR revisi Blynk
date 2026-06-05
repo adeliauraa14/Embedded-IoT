@@ -1,6 +1,6 @@
-#define BLYNK_TEMPLATE_ID    "TMPL6uSpswbda"
-#define BLYNK_TEMPLATE_NAME "UAP"
-#define BLYNK_AUTH_TOKEN    "Ph3qJ_HCvyQcYvdpYffvg7VJaSoVQtyG"
+#define BLYNK_TEMPLATE_ID "TMPL66DnfjZN2"
+#define BLYNK_TEMPLATE_NAME "Rain dan LDR"
+#define BLYNK_AUTH_TOKEN    "ljOvSS75rjcFe4nN3nNnr3lswKhfAfTr"
 
 #include <ESP8266WiFi.h>
 #include <BlynkSimpleEsp8266.h>
@@ -13,7 +13,7 @@ char pass[] = "oooooooo";
 const int pinHujan  = D5;
 const int pinLDR    = A0;
 const int pinServo  = D4;
-const int pinBuzzer = D1;
+const int pinBuzzer = D3;
 
 Servo myservo;
 BlynkTimer timer;
