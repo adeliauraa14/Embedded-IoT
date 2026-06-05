@@ -1,1 +1,106 @@
+#define BLYNK_TEMPLATE_ID   "TMPL66DnfjZN2" 
+#define BLYNK_TEMPLATE_NAME "UAP LDR dan DHT11"
+#define BLYNK_AUTH_TOKEN    "ljOvSS75rjcFe4nN3nNnr3lswKhfAfTr"
 
+#include <ESP8266WiFi.h>
+#include <BlynkSimpleEsp8266.h>
+#include <DHT.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+char auth[] = BLYNK_AUTH_TOKEN;
+char ssid[] = "iPhone";     
+char pass[] = "oooooooo"; 
+
+#define LDR_PIN   A0   
+#define DHT_PIN   D5   // AMAN: DHT11 dipindah ke D5 agar D1 & D2 fokus untuk LCD I2C
+#define LED_LAMPU D3   
+
+#define DHTTYPE DHT11  
+DHT dht(DHT_PIN, DHTTYPE);
+
+// ESP8266 otomatis mendeteksi SDA di D2 dan SCL di D1
+LiquidCrystal_I2C lcd(0x27, 16, 2); 
+
+const int batasGelap = 400; 
+BlynkTimer timer;
+
+void kirimDataSensor() {
+  float kelembapan = dht.readHumidity();
+  float suhu = dht.readTemperature();
+  int nilaiLDR = analogRead(LDR_PIN); 
+
+  if (isnan(kelembapan) || isnan(suhu)) {
+    Serial.println("Gagal membaca dari sensor DHT!");
+    lcd.setCursor(0, 0);
+    lcd.print("Error Sensor DHT");
+    return; 
+  }
+
+  // Logika Kontrol Lampu Kandang
+  if (nilaiLDR > batasGelap) {
+    digitalWrite(LED_LAMPU, HIGH); 
+  } else {
+    digitalWrite(LED_LAMPU, LOW);  
+  }
+
+  // Hanya nilai LDR yang dikonversi dari rentang (0-1023) ke rentang (0-4095)
+  int ldrUntukBlynk = map(nilaiLDR, 0, 1023, 0, 4095);
+
+  // Kirim data langsung ke widget Blynk kamu
+  Blynk.virtualWrite(V0, ldrUntukBlynk);  // V0: Gauge Intensitas Cahaya (0 - 4095)
+  Blynk.virtualWrite(V1, suhu);           // V1: Gauge Suhu Ruangan (0 - 100)
+  Blynk.virtualWrite(V2, kelembapan);     // V2: Gauge Kelembapan Ruangan (0 - 100)
+  
+  // V3: Mengirim status tulisan ke widget "Kondisi Kandang" di bagian bawah
+  if (nilaiLDR > batasGelap) {
+    Blynk.virtualWrite(V3, "Kandang Gelap - Lampu ON");
+  } else {
+    Blynk.virtualWrite(V3, "Kandang Cerah - Lampu OFF");
+  }
+
+  // Tampilan LCD Lokal
+  lcd.setCursor(0, 0);
+  lcd.print("T:"); lcd.print((int)suhu); lcd.print("C ");
+  lcd.print("H:"); lcd.print((int)kelembapan); lcd.print("%   "); 
+
+  lcd.setCursor(0, 1);
+  if (nilaiLDR > batasGelap) {
+    lcd.print("Lmp: ON (Gelap) ");
+  } else {
+    lcd.print("Lmp: OFF(Cerah) ");
+  }
+
+  // Debug Serial Monitor
+  Serial.print("Suhu: "); Serial.print(suhu); Serial.print("C | ");
+  Serial.print("Lembab: "); Serial.print(kelembapan); Serial.print("% | ");
+  Serial.print("LDR Asli: "); Serial.print(nilaiLDR);
+  Serial.print(" | LDR Blynk: "); Serial.println(ldrUntukBlynk);
+}
+
+void setup() {
+  Serial.begin(115200); 
+  dht.begin();
+  
+  // Inisialisasi komunikasi I2C bawaan ESP8266 (SDA=D2, SCL=D1)
+  Wire.begin(D2, D1); 
+  lcd.init();
+  lcd.backlight();
+  
+  pinMode(LED_LAMPU, OUTPUT);
+
+  lcd.setCursor(0, 0);
+  lcd.print("  SMART FARMING ");
+  lcd.setCursor(0, 1);
+  lcd.print("  INITIALIZING  ");
+  
+  Blynk.begin(auth, ssid, pass);
+  lcd.clear();
+
+  timer.setInterval(1500L, kirimDataSensor);
+}
+
+void loop() {
+  Blynk.run();
+  timer.run();
+}
