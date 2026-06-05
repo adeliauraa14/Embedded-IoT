@@ -1,0 +1,48 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+#define LDR_PIN A0          // Pin Analog untuk Sensor Cahaya LDR
+#define LED_LAMPU 3         // Pin Digital untuk Aktuator LED (Lampu)
+
+LiquidCrystal_I2C lcd(0x27, 16, 2); 
+const int batasGelap = 400; 
+
+void setup() {
+  Serial.begin(9600); 
+  lcd.init();
+  lcd.backlight();
+  
+  pinMode(LED_LAMPU, OUTPUT);
+  pinMode(LDR_PIN, INPUT);
+
+  lcd.setCursor(0, 0);
+  lcd.print("  LDR CONTROLLER ");
+  lcd.setCursor(0, 1);
+  lcd.print("   INITIALIZING ");
+  delay(2000);
+  lcd.clear();
+}
+
+void loop() {
+  int nilaiLDR = analogRead(LDR_PIN); 
+
+  if (nilaiLDR > batasGelap) {
+    digitalWrite(LED_LAMPU, HIGH); 
+  } else {
+    digitalWrite(LED_LAMPU, LOW);  
+  }
+
+  lcd.setCursor(0, 0);
+  lcd.print("LDR Value: ");
+  lcd.print(nilaiLDR);
+  lcd.print("    ");
+
+  lcd.setCursor(0, 1);
+  if (nilaiLDR > batasGelap) {
+    lcd.print("Lmp: ON (Gelap) ");
+  } else {
+    lcd.print("Lmp: OFF(Cerah) ");
+  }
+
+  delay(1500);
+}
