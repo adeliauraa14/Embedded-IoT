@@ -1,1 +1,114 @@
+#define BLYNK_TEMPLATE_ID   "TMPL66DnfjZN2" // Gunakan ID Template kelompokmu
+#define BLYNK_TEMPLATE_NAME "UAP Soil dan DHT11"
+#define BLYNK_AUTH_TOKEN    "ljOvSS75rjcFe4nN3nNnr3lswKhfAfTr"
 
+#include <ESP8266WiFi.h>
+#include <BlynkSimpleEsp8266.h>
+#include <DHT.h>
+#include <Servo.h>
+
+// Akun Wi-Fi / Hotspot HP
+char auth[] = BLYNK_AUTH_TOKEN;
+char ssid[] = "iPhone";     
+char pass[] = "oooooooo"; 
+
+// Penyesuaian Pin Fisik untuk ESP8266 NodeMCU
+#define PIN_DHT        D2   // Pin Digital D2 untuk Sensor DHT11
+#define PIN_SOIL       A0   // Satu-satunya pin analog di ESP8266
+#define PIN_SERVO      D5   // Pin Digital D5 untuk Servo (Penyiram/Keran)
+#define PIN_LED_HIJAU  D1   // Pin Digital D1 untuk LED Indikator Level 1
+#define PIN_LED_KUNING D3   // Pin Digital D3 untuk LED Indikator Level 2
+#define PIN_LED_MERAH  D4   // Pin Digital D4 untuk LED Indikator Level 3
+
+// Ambang Batas Logika Lokal (Menggunakan nilai analog asli 0 - 1023)
+#define SOIL_BATAS     500   
+#define SUHU_BATAS     31    
+
+DHT dht(PIN_DHT, DHT11);
+Servo servo;
+BlynkTimer timer; // Timer non-blocking agar koneksi internet Blynk tidak putus
+
+void kirimDataSensor() {
+  int soil = analogRead(PIN_SOIL);
+  float suhu = dht.readTemperature();
+
+  if (isnan(suhu)) {
+    Serial.println("Gagal membaca dari sensor DHT!");
+    return;
+  }
+
+  // --- MATRIKS KONVERSI UNTUK BLYNK ---
+  // Mengonversi nilai analog soil (0 - 1023) menjadi persen kelembapan (0% - 100%)
+  // Kita balik: 1023 (kering) menjadi 0%, dan 0 (basah) menjadi 100% agar sesuai widget Blynk kamu
+  int persenSoil = map(soil, 1023, 0, 0, 100);
+  
+  // Batasi nilai agar tetap berada di range 0 - 100% jika terjadi fluktuasi pembacaan
+  if (persenSoil < 0) persenSoil = 0;
+  if (persenSoil > 100) persenSoil = 100;
+
+  // --- PENGIRIMAN DATA KE VIRTUAL PIN BLYNK ---
+  Blynk.virtualWrite(V0, suhu);        // V0: Gauge Suhu Ruangan (0 - 100)
+  // Catatan: Pastikan di dashboard Blynk kamu, susunan widget sesuai dengan urutan V0, V1, V2
+  Blynk.virtualWrite(V1, dht.readHumidity()); // V1: Gauge Kelembapan Ruangan (0 - 100)
+  Blynk.virtualWrite(V2, persenSoil);   // V2: Gauge Kelembapan Tanah (0 - 100%)
+
+  // Tentukan status logika boolean lokal untuk kontrol fisik & status teks Blynk
+  bool tanahKering = (soil > SOIL_BATAS);
+  bool suhuPanas   = (suhu > SUHU_BATAS);
+
+  // Reset semua kondisi LED fisik
+  digitalWrite(PIN_LED_HIJAU,  LOW);
+  digitalWrite(PIN_LED_KUNING, LOW);
+  digitalWrite(PIN_LED_MERAH,  LOW);
+
+  // --- LOGIKA UTAMA PROGRAM (LEVEL 1, 2, 3) ---
+  if (!tanahKering && !suhuPanas) {
+    // Kondisi Aman (Level 1)
+    digitalWrite(PIN_LED_HIJAU, HIGH);
+    servo.write(0);
+    Blynk.virtualWrite(V3, "Level 1 - NORMAL"); // V3: Status Irigasi (Teks di widget bawah)
+    Serial.println("Level 1 - NORMAL | Servo 0 deg");
+  } 
+  else if (tanahKering && suhuPanas) {
+    // Kondisi Kritis (Level 3)
+    digitalWrite(PIN_LED_MERAH, HIGH);
+    servo.write(90);
+    Blynk.virtualWrite(V3, "Level 3 - KRITIS");
+    Serial.println("Level 3 - KRITIS | Servo 90 deg");
+  } 
+  else {
+    // Kondisi Siaga (Level 2)
+    digitalWrite(PIN_LED_KUNING, HIGH);
+    servo.write(45);
+    Blynk.virtualWrite(V3, "Level 2 - SIAGA");
+    Serial.println("Level 2 - SIAGA  | Servo 45 deg");
+  }
+
+  // Debug ke Serial Monitor Laptop
+  Serial.print("Soil Analog: "); Serial.print(soil);
+  Serial.print(" ("); Serial.print(persenSoil); Serial.print("%)");
+  Serial.print(" | Suhu: "); Serial.print(suhu); Serial.println(" C");
+}
+
+void setup() {
+  Serial.begin(115200); // Kecepatan baud rate standar ESP8266
+  dht.begin();
+  servo.attach(PIN_SERVO);
+
+  pinMode(PIN_LED_HIJAU,  OUTPUT);
+  pinMode(PIN_LED_KUNING, OUTPUT);
+  pinMode(PIN_LED_MERAH,  OUTPUT);
+
+  servo.write(0); // Posisi awal servo menutup keran
+
+  // Memulai koneksi ke server Blynk via Wi-Fi hotspot "iPhone"
+  Blynk.begin(auth, ssid, pass);
+
+  // Mengatur interval eksekusi pembacaan sensor setiap 2 detik (2000 milidetik)
+  timer.setInterval(2000L, kirimDataSensor);
+}
+
+void loop() {
+  Blynk.run(); // Menjaga stabilitas koneksi IoT ke server Blynk
+  timer.run(); // Menggerakkan fungsi internal timer secara berkala
+}
